@@ -1,49 +1,76 @@
-package main
+package main 
 
 import (
-  "net/http"
-  "github.com/labstack/echo/v4"
-  "fmt"
+ "net/http"
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/labstack/echo/v4/middleware"
 )
 
+type user struct {
+  ID int `json:"id"`
+  Name string `json:name"`
+ }
 
 
-func main() {
-  e := echo.New()
-  e.GET("/", func(c echo.Context) error {
-    return c.String(http.StatusOK, "Hello World!")
+var (
+ users = map[int]*user{}
+ seq = 1
+)
 
-  })
-  e.Logger.Fatal(e.Start(":1323"))
+//Handlers
 
-  e.POST("/users", saveUser)
-  e.GET("/users/:id", getUser)
-  //e.PUT("/users/:id", updateUser)
-  //e.DELETE("/users/:id", deleteUser)
+func createUser(c echo.Context) error {
+ u := &user{
+  ID: seq,
+ }
+ if err := c.Bind(u); err != nil {
+  return err
+ }
+ users[u.ID] = u
+ seq++
+ return c.JSON(http.StatusCreated, u)
 }
 
-//e.GET("/users/:id", getUser)
 func getUser(c echo.Context) error {
- // User ID from path 'users/:id
- id := c.Param("id")
- fmt.Println(id)
- return c.String(http.StatusOK, id)
+ id, _ := strconv.Atoi(c.Param("id"))
+ return c.JSON(http.StatusOK, users[id])
 }
 
-// e.GET("/show", show)
-func show(c echo.Context) error {
- // Get team and member from the query string 
- team := c.QueryParam("team")
- member := c.QueryParam("member")
- return c.String(http.StatusOK, "team:" + team + ", member: " + member)
+func updateUser(c echo.Context) error {
+ u := new(user)
+ if err := c.Bind(u); err != nil {
+  return err
+ }
+ id, _ := strconv.Atoi(c.Param("id"))
+ users[id].Name = u.Name
+ return c.JSON(http.StatusOK, users[id])
 }
 
-// e.POST("/save", saveUser)
-func saveUser(c echo.Context) error {
- //Get name and email
- name := c.FormValue("name")
- email := c.FormValue("email")
- return c.String(http.StatusOK, "name: " + name + ", email:" + email)
+func deleteUser(c echo.Context) error {
+ id, _ := strconv.Atoi(c.Param("id"))
+ delete(users,id)
+ return c.NoContent(http.StatusNoContent)
 }
 
+func getAllUsers(c echo.Context) error {
+ return c.JSON(http.StatusOK, users)
+}
 
+func main () {
+ e := echo.New()
+
+ //middleware
+ e.Use(middleware.Logger())
+ e.Use(middleware.Recover())
+
+ //Routes
+ e.GET("/users", getAllUsers)
+ e.POST("/users", createUser)
+ e.GET("/users/:id", getUser)
+ e.PUT("/users/:id", updateUser)
+ e.DELETE("/users/:id", deleteUser)
+
+ //start server
+ e.Logger.Fatal(e.Start(":1323"))
+}
